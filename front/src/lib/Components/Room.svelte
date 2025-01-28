@@ -1,0 +1,215 @@
+<script lang="ts">
+    import { io } from "socket.io-client";
+    import { SvelteSet } from "svelte/reactivity";
+    import Buzzer from "./Buzzer.svelte";
+    import ChooseCategory from "./ChooseCategory.svelte";
+
+    let {roomName, leaveRoom} = $props();
+    console.log("Room name in child:", roomName); 
+        let gameStarted = $state<boolean>(false)
+        let username = $state<string>(localStorage.getItem('username'))
+
+        let categories: object = {};
+        let category: string = ""
+        let clues: Array<string> = ["a","b","a"]
+        let timer: Number = 20;
+        let answer: string = "hehexd";
+        let guess: string = "";
+        let scores: Array<number> = $state([0,0]);
+        let userTeam: string = $state("");
+        let activePlayer: string = $state("");
+        let currentQuestion: string = "";
+
+        if (!username) {
+            username = "user" + Math.floor(Math.random() * 10000)
+            setUsername(username)
+        }
+        let currentScene = $state<string>("main")
+        let players = $state(new SvelteSet([username]));
+
+        function setUsername(newUsername:string) {
+            localStorage.setItem('username', newUsername);
+            username = newUsername;
+        }
+        // init socket
+        const socket = io("http://bevsoft.com", {
+                auth: {
+                    serverOffset: 0,
+                    username: username,
+                    room: roomName
+                },
+                path: "/socket2/"
+            });
+    
+        socket.on("disconnect", () => {
+            //send the username to the server
+            console.log(`user ${socket.id} disconnected`);
+        });
+        socket.on("connect", () => {
+            console.log(socket.auth);
+        });
+
+        socket.on("joinRoom", (roomDetails:Object) => {
+            console.log("joined room which consists of: ", roomDetails)
+            for (let player of Object.keys(roomDetails)) {
+                players.add(player)
+            }
+        })
+
+        socket.on("playerJoined", (player: string) => {
+            console.log(`user ${player} joined`);
+            players.add(player)
+            console.log($state.snapshot(players))
+        })
+        socket.on("playerLeft", (player: string) => {
+            console.log(`user ${player} left`);
+            players.delete(player)
+            console.log($state.snapshot(players))
+        })
+ 
+        socket.on("chooseCategory", (scene: string, gameState: object, team: string, guesser:string) => {
+            console.log(`changing scene to ${scene} with categories ${categories}`)
+            
+            currentScene = scene
+            if (currentScene === "main") {
+                gameStarted = false
+            }
+            categories = gameState
+            userTeam = team
+            activePlayer = guesser
+        })
+
+        socket.on("buzzer", (scene: string) => {
+            console.log(`changing scene to ${scene} with categories ${categories}`)
+            
+            currentScene = scene
+        })
+
+        socket.on("guessAnswer", (scene: string, question: string ) => {
+            currentScene = scene;
+            currentQuestion = question;
+        })
+
+        //////// FUNCTIONS
+        const changeName = async (newName: string) => {
+            const success = await new Promise(resolve=> {
+                socket.emit("changeName", username, newName, roomName, (response) => {
+                    if (response) {
+                        resolve(response.status === 'ok')
+                    }
+                    resolve(false);
+                })
+            })
+            if (success) {
+                setUsername(newName)
+                return true;
+            } 
+            return false
+        }
+
+        console.log("roomname is", roomName)
+        const changeNamePrompt = async () => {
+            console.log("changing name")
+            let newName: string = prompt("Please enter your username", username)
+            if (newName.length > 0 && newName.length < 30 && newName != username) {
+
+                const nameChangeSuccess = await changeName(newName);
+                if (!nameChangeSuccess) {
+                    alert("Error: There is already a player in the room with the name: ");
+                    await changeNamePrompt()
+                } 
+            } else {
+                alert("Name must be between 1 and 30 chars and unique. Try again!")
+            }
+        }
+
+        // submit event to server and proceed to next scene
+        const submitAnswer = (input: string) => {
+            socket.emit("submitAnswer", input)
+            console.log(`submitted ${input} for` ,currentScene)
+        }
+        
+        const chooseCategory = (category: string, amount: number) => {
+            //convert the amount into an index
+            socket.emit("chooseCategory", category, amount/100 - 1);
+        }
+
+        const leave = () => {
+            socket.disconnect()
+            leaveRoom()
+        }
+
+        const startGame = async () => {
+            console.log("starting the game")
+            console.log("players are", players)
+            if (players.size < 1) {
+                alert("must have at least 2 players to play!")
+            } else {
+                console.log("we got enough players nice")
+                socket.emit("startGame", (response) => {
+                    console.log("callback was", response)
+                })
+                gameStarted = true
+            }
+        }
+    </script>
+    
+    <button onclick={()=>leave()}>Leave room</button>
+    
+    <h3>Room: 
+        <strong>{roomName}</strong>
+    </h3>
+
+    <h4>Username: 
+        <strong>{username}</strong>
+    </h4>
+    
+    {#if currentScene==="main" || currentScene==="endGame"}
+        <button onclick={changeNamePrompt}>Change Name</button>
+    {/if}
+
+    <h4>Players in Lobby: 
+        <ul>
+            {#each players.keys() as player}
+                <li>{player}</li>
+            {/each}
+        </ul>
+    </h4>
+<div>
+    Scores:
+    <div>Team A: ${scores[0]}</div>
+    <div>Team B: ${scores[1]}</div>
+</div>
+{#if currentScene == "main"}
+    <div>
+        <h4>How to play: </h4>
+        <div class="justify-start">
+            <ol class="list-decimal list-inside inline-block">
+                <li>Select a category to answer a question</li>
+                <li>Press the buzzer to answer the question but you only have 10 seconds to type out your answer so don't press too early!</li>
+                <li>Please spell your answer correctly or you may not win the money!</li>
+                <li>Correctly answer questions to get money!</li>
+            </ol>
+        </div>
+    </div>
+    <button class="startButton" onclick={startGame}>Start</button>
+
+{:else if currentScene === "chooseCategory"}
+
+    <p>My team is {team}</p>
+    <ChooseCategory {categories} teamName={team} {guessingTeam} submitAnswer={chooseCategory} />
+
+{:else if currentScene === "buzzer"}
+
+    <p>My team is {team}</p>
+    <Buzzer question={currentQuestion}/>
+
+{:else if currentScene === "buzzer"}
+
+    <p>My team is {team}</p>
+    <Buzzer question={currentQuestion} {socket}/>
+
+{/if}
+
+
+<Buzzer question={currentQuestion} {socket}/>
