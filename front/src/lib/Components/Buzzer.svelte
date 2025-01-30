@@ -1,10 +1,12 @@
 <script>
     import buttonImage from "../../assets/button.png";
     
-    const { question, socket} = $props();
+    const { question, username, socket} = $props();
     let audio
     const buzz = () => {
         audio.play()
+    console.log("buzzerPressed", username)
+        socket.emit("buzzerPressed");
     }
     let showToast = $state(false);
     let toastMessage = $state("");

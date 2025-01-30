@@ -30,6 +30,7 @@
         let currentTeam = 0;
         let userTeam: string = $state("");
         let activePlayer: string = $state("");
+        let currentAmount: number = $state(0);
         let currentQuestion: string = "";
 
         if (!username) {
@@ -91,30 +92,31 @@
             }
         })
  
-        socket.on("chooseCategory", (scene: string, gameState: object, team: string, guesser:string) => {
-            console.log(`changing scene to ${scene} with categories ${categories}`)
+        socket.on("chooseCategory", (gameState: object,  guesser:string) => {
+            console.log(`changing scene to chooseCategory with categories ${gameState} and ${guesser} choosing category`)
             
-            currentScene = scene
+            currentScene = "chooseCategory"
             if (currentScene === "main") {
                 gameStarted = false
             }
             categories = gameState
-            userTeam = team
             activePlayer = guesser
         })
 
-        socket.on("buzzer", (scene: string) => {
-            console.log(`changing scene to ${scene} with categories ${categories}`)
-            currentScene = scene
+        socket.on("buzzer", (question: string, amount: number) => {
+            console.log(`changing scene to buzzer with quetsion ${question} and amount ${amount}`)
+            currentQuestion = question
+            currentAmount = amount
+            currentScene = "buzzer"
         })
 
-        socket.on("guessAnswer", (scene: string, question: string ) => {
-            currentScene = scene;
+        socket.on("guessAnswer", (question: string ) => {
+            currentScene = "guessAnswer";
             currentQuestion = question;
         })
 
         socket.on("scoreChange", (teamId: number, newScore: number ) => {
-
+            teams[teamId].score = newScore;
         })
 
         //////// FUNCTIONS
@@ -241,7 +243,7 @@
 {:else if currentScene === "buzzer"}
 
     <p>My team is {currentTeam}</p>
-    <Buzzer question={currentQuestion} {socket}/>
+    <Buzzer question={currentQuestion} {username} {socket}/>
 
 {:else if currentScene === "submitAnswer"}
 
@@ -250,7 +252,6 @@
 
 {/if}
 
-<Buzzer question={currentQuestion} {socket}/>
 
 
 <style>

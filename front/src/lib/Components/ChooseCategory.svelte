@@ -5,8 +5,10 @@
     const isActivePlayer = $state((activePlayer === username));
 
     const submit = (category, amount) => {
-        //dont do anything if its not the active team playing
-        if (!isGuessing) {
+        //dont do anything if its not the active team playing        
+        console.log("category amount is ", category, amount)
+
+        if (!isActivePlayer) {
             return;
         }
         submitAnswer(category, amount)
@@ -27,7 +29,7 @@
 
             <div class="tile">
                 {#if !item.guessed}
-                    <button disabled={isActivePlayer} class="tileButton" onclick={()=> submit(items[0], item.value)}>
+                    <button disabled={!isActivePlayer} class="tileButton" onclick={()=> submit(items[0], item.value)}>
                         <span style={"font-size: 30px"}>${item.value}</span>
                     </button> 
                 {/if}

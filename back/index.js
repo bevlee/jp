@@ -15,7 +15,7 @@ const io = new Server(server, {
   path: "/socket2/"
 });
 const defaultState = () => {
-  return [1,2,3,4,5].map((item) => {
+  return [1,2,3].map((item) => {
     return {
       guessed: false,
       value: item*100
@@ -26,6 +26,31 @@ const categories = {
   anime: defaultState(),
   geography: defaultState(),
   gaming: defaultState(),
+  science: defaultState(),
+  random: defaultState(),
+}
+
+const questions = {  
+  anime:
+  [
+    ["anime1"],["anime2"],["anime3"],
+  ],
+  geography: 
+  [
+    ["geography1"],["geography2"],["geography3"],
+  ],
+  gaming:
+  [
+    ["gaming1"],["gaming2"],["gaming3"],
+  ],
+  science:
+  [
+    ["gaming1"],["gaming2"],["gaming3"],
+  ],
+  random:
+  [
+    ["gaming1"],["gaming2"],["gaming3"],
+  ]
 }
 // list of connections per room
 const connections = {
@@ -33,18 +58,6 @@ const connections = {
 };
 let activeGames = {};
 const teamNames = ["Michelle", "Edana"]
-let baseTeams = [
-  {
-    name: teamNames[0],
-    members: [],
-    score: 0
-  },
-  {
-    name: teamNames[1],
-    members: [],
-    score: 0
-  }
-]
 
 //GAME VARS
 
@@ -59,15 +72,12 @@ io.on("connection", async (socket) => {
   let rooms = io.sockets.adapter.rooms;
   console.log("the current connected clients are ", rooms);
   const teamSets = connections[room].teams;
-  console.log("teamsets:, ", teamSets)
   const players = Object.keys(connections[room]).filter(key=>key != "teams")
-  console.log()
   const updatedTeams = [[...teamSets[0]], [...teamSets[1]]]
   socket.to(room).emit("playerJoined", username, updatedTeams);
   socket.emit("joinRoom", players, updatedTeams);
 
   socket.on("changeName", (oldName, newName, room, callback) => {
-    console.log("existing room connections:", connections[room]);
     console.log("changing name:", oldName, newName, callback);
     if (connections[room][newName]) {
       callback({
@@ -94,7 +104,6 @@ io.on("connection", async (socket) => {
       connections[room][name].team = 1-team;
       connections[room].teams[team].delete(name)
       connections[room].teams[1-team].add(name)
-      console.log("new room connections:", connections[room]);
 
     const teamSets = connections[room].teams;
       io.to(room).emit("changeTeam", [[...teamSets[0]], [...teamSets[1]]]);
@@ -104,8 +113,7 @@ io.on("connection", async (socket) => {
   });
 
   socket.on("disconnect", (reason) => {
-    console.log(username)
-    console.log(reason + " disconnected");
+    console.log(username +" disconnected, reason:" + reason);
     removeConnection(socket);
     const teamSets = connections[room].teams;
     for (const team of teamSets) {
@@ -136,10 +144,11 @@ io.on("connection", async (socket) => {
     stopGame(socket, room);
   });
 
-  socket.on("chooseCategory", (category) => {
+  socket.on("chooseCategory", (category, amount) => {
     console.log("choosing category with activegames:", activeGames);
     if (activeGames[room] && activeGames[room]["stage"] == "chooseCategory") {
       activeGames[room]["category"] = category;
+      activeGames[room]["amount"] = amount;
     }
   });
   socket.on("submitAnswer", (answer) => {
@@ -149,6 +158,8 @@ io.on("connection", async (socket) => {
     }
   });
   socket.on("buzzerPressed", () => {
+    console.log("buzzerPressed", username)
+    console.log("waiting for buzzer:", (activeGames[room]["waitingForBuzzer"]))
     if (activeGames[room]["waitingForBuzzer"]) {
       activeGames[room]["waitingForBuzzer"] = false;
       activeGames[room]["buzzerWinner"] = username;
@@ -172,41 +183,58 @@ const getRandomSelection = (upperBound) => {
 const startGameLoop = async (io, room) => {
 
   // assign players into two teams
-  let allPlayers = Object.entries(connections[room]);
 
+  const teamSets = connections[room].teams;
+  const players = Object.keys(connections[room]).filter(key=>key != "teams")
+  console.log("all PLayers", players)
   let currentPlayer = 0;
-  activeGames[room]["gameState"] = categories;
-  activeGames[room]["teams"] = baseTeams;
+  //init game room
+  activeGames[room] = {
+    stage: "chooseCategory",
+    state: categories,
+    scores: [0,0],
+    category: "",
+    amount:  0,
+    buzzerWinner: "",
+    answer: ""
+  };
   
   let guesses = 0;
+  const timeLimit = 15;
   // Loop until all categories have been elected
   while (guesses < 20) {
-    io.to(room).emit("chooseCategory", activeGames[room]["gameState"], allPlayers[currentPlayer]);
+    activeGames[room].answer = ""
+    io.to(room).emit("chooseCategory", activeGames[room].state, players[currentPlayer]);
     
     // wait for the guesser to choose a category'\'s
     await waitForCondition(() => {
-      return (activeGames[room]["selection"] !== {});
+      return (activeGames[room]["category"] !== "");
     }, timeLimit);
-    console.log("chooseCategory condition finished", activeGames[room]["selection"]);
+    console.log("chooseCategory condition finished", activeGames[room].category);
 
-    const category = activeGames[room]["selection"][0];
-    const questionNo = activeGames[room]["selection"][1];
+    const category = activeGames[room].category;
+    const questionNo = activeGames[room].amount;
     const question = questions[category][questionNo];
 
     //start the buzzer phase
     io.to(room).emit("buzzer", question);
 
+    activeGames[room]["waitingForBuzzer"] = true;
     let answer = activeGames[room]["answer"];
 
     await waitForCondition(() => {
-      return activeGames[room]["buzzerWinner"] !== "";
+      return activeGames[room].buzzerWinner !== "";
     }, timeLimit);
     let buzzerWinner = activeGames[room]["buzzerWinner"];
-    let buzzerWinnerId = connections[room]["buzzerWinner"].playerId
-    let buzzerWinnerTeam = connections[room]["buzzerWinner"].team
+    console.log("buzzerWInner", buzzerWinner)
+    console.log(connections[room][buzzerWinner])
+    let buzzerWinnerId = connections[room][buzzerWinner].playerId
+    let buzzerWinnerTeam = connections[room][buzzerWinner].team
+
+    
     io.to(buzzerWinnerId).emit("submitAnswer", "question");
     io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
-    activeGames[room]["buzzerWinner"] = "";
+    activeGames[room].buzzerWinner = "";
 
     await waitForCondition(() => {
       return activeGames[room]["answer"] !== "";
@@ -214,27 +242,28 @@ const startGameLoop = async (io, room) => {
     
     while (answer !== answers[category][questionNo]) {
 
-      activeGames[room][teams][buzzerWinnerTeam] -= 50;
-      io.to(room).emit("scoreChange", buzzerWinnerTeam, activeGames[room][teams][buzzerWinnerTeam])
+      activeGames[room].scores[buzzerWinnerTeam] -= 50;
+      io.to(room).emit("scoreChange", buzzerWinnerTeam, activeGames[room].scores[buzzerWinnerTeam])
       activeGames[room]["answer"] = ""
       io.to(room).emit("buzzer", question);
   
+      activeGames[room]["waitingForBuzzer"] = true;
       await waitForCondition(() => {
         return activeGames[room]["buzzerWinner"] !== "";
-      }, timeLimit);
-      buzzerWinner = activeGames[room]["buzzerWinner"];
-      buzzerWinnerId = connections[room]["buzzerWinner"].playerId
+      }, 1000);
+      buzzerWinner = activeGames[room].buzzerWinner;
+      buzzerWinnerId = connections[room][buzzerWinner].playerId
       
       io.to(buzzerWinnerId).emit("submitAnswer", "question");
       io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
-      activeGames[room]["buzzerWinner"] = "";
+      activeGames[room][buzzerWinner] = "";
   
   
       await waitForCondition(() => {
-        return activeGames[room]["answer"] !== "";
+        return activeGames[room].answer !== "";
       }, timeLimit);
       
-      answer = activeGames[room]["answer"];
+      answer = activeGames[room].answer;
       if (answer !== answers[category][questionNo]) {
         io.to(room).emit("buzzer", question);
   
@@ -242,15 +271,15 @@ const startGameLoop = async (io, room) => {
         io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
       }
     }
-    const questionData = activeGames[room]["gameState"][category][questionNo]
+    const questionData = activeGames[room].gameState[category][questionNo]
     questionData.guessed = true;
 
     activeGames[room][teams][buzzerWinnerTeam] += questionData.value;
-    io.to(room).emit("scoreChange", buzzerWinnerTeam, activeGames[room][teams][buzzerWinnerTeam])
+    io.to(room).emit("scoreChange", buzzerWinnerTeam, activeGames[room].scores[buzzerWinnerTeam])
     guesses += 1;
   }
   
-  const scores = activeGames[room][teams].map(team => team.score)
+  const scores = activeGames[room].scores;
   io.to(room).emit("gameFinished", (scores));
 
   await new Promise((resolve) => setTimeout(() => resolve(), 5000));
