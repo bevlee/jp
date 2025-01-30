@@ -62,11 +62,9 @@
         });
 
         socket.on("userUpdate", ( team:number) => {
-            console.log("changing team", team)
             currentTeam = team;
         });
         socket.on("changeTeam", ( updatedTeams) => {
-            console.log("changing team", updatedTeams)
             teams[0].members = updatedTeams[0]
             teams[1].members = updatedTeams[1]
         });
@@ -75,43 +73,22 @@
             players = players;
             teams[0].members = teamSets[0]
             teams[1].members = teamSets[1]
-            // //don't add if they already exist
-            // // if (!teams[0].members.has(username) || !teams[0].members.has(username)) {
-
-            // //     if (teams[1].members.size < teams[0].members.size) {
-            // //         currentTeam = 1
-            // //     } else {
-            // //         currentTeam = 0
-            // //     }
-            // teams[currentTeam].members.add(username);
-            // // socket.emit("changeTeam", username, currentTeam, roomName);
-            // console.log(teams)
-
-
         })
 
         socket.on("playerJoined", (player: string, teamSets = undefined) => {
-            console.log(`user ${player} joined`);
             players.add(player)
-            console.log($state.snapshot(players))
-            console.log("teamsets is", teamSets)
             if (teamSets) {
-
                 teams[0].members = teamSets[0]
                 teams[1].members = teamSets[1]
             }
-
         })
         socket.on("playerLeft", (player: string, teamSets = undefined) => {
             console.log(`user ${player} left`);
             players.delete(player)
-            console.log("teamsets is", teamSets)
             if (teamSets) {
-
                 teams[0].members = teamSets[0]
                 teams[1].members = teamSets[1]
             }
-            console.log($state.snapshot(players))
         })
  
         socket.on("chooseCategory", (scene: string, gameState: object, team: string, guesser:string) => {
@@ -222,19 +199,18 @@
         <button onclick={changeNamePrompt}>Change Name</button>
     {/if}
 
-    <h4>Players in Lobby: 
+    <!-- <h4>Players in Lobby: 
         <ul>
             {#each players.keys() as player}
                 <li>{player}</li>
             {/each}
         </ul>
-    </h4>
+    </h4> -->
 <div class="teamContainer">
     Teams:
     {#each teams as team}
 
     <div>Team {team.name}: ${team.score}</div>
-    {console.log("team is ", team)}
         {#each team.members as member}
 
             <div class="teamMember">{member}</div>

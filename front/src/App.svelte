@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ChooseCategory from "./lib/Components/ChooseCategory.svelte";
   import Home from "./lib/Components/Home.svelte";
   import Room from "./lib/Components/Room.svelte";
 
@@ -96,7 +95,6 @@
   <div>
   </div>
   <div class="main">
-    <ChooseCategory {categories} teamName={"lol"} guessingTeam={"lol"} submitAnswer={()=>{}}/>
 {#if !roomSelected}
   <Home 
     {joinRoom}
