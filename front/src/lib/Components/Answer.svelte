@@ -4,7 +4,7 @@
     
     const { question, submitAnswer} = $props();
     let answer = $state("");
-    const submit = (answer: string) => {
+    const submit = (answer) => {
         submitAnswer(answer);
     }
 </script>

@@ -1,6 +1,7 @@
 <script lang="ts">
     import { io } from "socket.io-client";
     import { SvelteSet } from "svelte/reactivity";
+    import Answer from "./Answer.svelte";
     import Buzzer from "./Buzzer.svelte";
     import ChooseCategory from "./ChooseCategory.svelte";
 
@@ -11,11 +12,22 @@
 
         let categories: object = {};
         let category: string = ""
-        let clues: Array<string> = ["a","b","a"]
         let timer: Number = 20;
         let answer: string = "hehexd";
         let guess: string = "";
-        let scores: Array<number> = $state([0,0]);
+        let teams = $state([
+            {
+                name: "Michelle",
+                score: 0,
+                members: new Set()
+            },
+            {
+                name: "Edana",
+                score: 0,
+                members: new Set()
+            }
+        ]);
+        let currentTeam = 0;
         let userTeam: string = $state("");
         let activePlayer: string = $state("");
         let currentQuestion: string = "";
@@ -32,7 +44,7 @@
             username = newUsername;
         }
         // init socket
-        const socket = io("http://bevsoft.com", {
+        const socket = io("http://localhost:3001", {
                 auth: {
                     serverOffset: 0,
                     username: username,
@@ -49,21 +61,56 @@
             console.log(socket.auth);
         });
 
-        socket.on("joinRoom", (roomDetails:Object) => {
-            console.log("joined room which consists of: ", roomDetails)
-            for (let player of Object.keys(roomDetails)) {
-                players.add(player)
-            }
+        socket.on("userUpdate", ( team:number) => {
+            console.log("changing team", team)
+            currentTeam = team;
+        });
+        socket.on("changeTeam", ( updatedTeams) => {
+            console.log("changing team", updatedTeams)
+            teams[0].members = updatedTeams[0]
+            teams[1].members = updatedTeams[1]
+        });
+        socket.on("joinRoom", (players: Array<string>, teamSets:Array<Set<String>>) => {
+            console.log("joined room which consists of: ", players, teamSets)
+            players = players;
+            teams[0].members = teamSets[0]
+            teams[1].members = teamSets[1]
+            // //don't add if they already exist
+            // // if (!teams[0].members.has(username) || !teams[0].members.has(username)) {
+
+            // //     if (teams[1].members.size < teams[0].members.size) {
+            // //         currentTeam = 1
+            // //     } else {
+            // //         currentTeam = 0
+            // //     }
+            // teams[currentTeam].members.add(username);
+            // // socket.emit("changeTeam", username, currentTeam, roomName);
+            // console.log(teams)
+
+
         })
 
-        socket.on("playerJoined", (player: string) => {
+        socket.on("playerJoined", (player: string, teamSets = undefined) => {
             console.log(`user ${player} joined`);
             players.add(player)
             console.log($state.snapshot(players))
+            console.log("teamsets is", teamSets)
+            if (teamSets) {
+
+                teams[0].members = teamSets[0]
+                teams[1].members = teamSets[1]
+            }
+
         })
-        socket.on("playerLeft", (player: string) => {
+        socket.on("playerLeft", (player: string, teamSets = undefined) => {
             console.log(`user ${player} left`);
             players.delete(player)
+            console.log("teamsets is", teamSets)
+            if (teamSets) {
+
+                teams[0].members = teamSets[0]
+                teams[1].members = teamSets[1]
+            }
             console.log($state.snapshot(players))
         })
  
@@ -81,13 +128,16 @@
 
         socket.on("buzzer", (scene: string) => {
             console.log(`changing scene to ${scene} with categories ${categories}`)
-            
             currentScene = scene
         })
 
         socket.on("guessAnswer", (scene: string, question: string ) => {
             currentScene = scene;
             currentQuestion = question;
+        })
+
+        socket.on("scoreChange", (teamId: number, newScore: number ) => {
+
         })
 
         //////// FUNCTIONS
@@ -107,6 +157,10 @@
             return false
         }
 
+        const changeTeam = async () => {
+            socket.emit("changeTeam", username, currentTeam, roomName);
+        }
+        
         console.log("roomname is", roomName)
         const changeNamePrompt = async () => {
             console.log("changing name")
@@ -175,10 +229,19 @@
             {/each}
         </ul>
     </h4>
-<div>
-    Scores:
-    <div>Team A: ${scores[0]}</div>
-    <div>Team B: ${scores[1]}</div>
+<div class="teamContainer">
+    Teams:
+    {#each teams as team}
+
+    <div>Team {team.name}: ${team.score}</div>
+    {console.log("team is ", team)}
+        {#each team.members as member}
+
+            <div class="teamMember">{member}</div>
+        {/each}
+
+    {/each}
+    <button onclick={changeTeam}> Change team </button>
 </div>
 {#if currentScene == "main"}
     <div>
@@ -196,20 +259,31 @@
 
 {:else if currentScene === "chooseCategory"}
 
-    <p>My team is {team}</p>
-    <ChooseCategory {categories} teamName={team} {guessingTeam} submitAnswer={chooseCategory} />
+    <p>My team is {currentTeam}</p>
+    <ChooseCategory {categories} {activePlayer} {username} submitAnswer={chooseCategory} />
 
 {:else if currentScene === "buzzer"}
 
-    <p>My team is {team}</p>
-    <Buzzer question={currentQuestion}/>
-
-{:else if currentScene === "buzzer"}
-
-    <p>My team is {team}</p>
+    <p>My team is {currentTeam}</p>
     <Buzzer question={currentQuestion} {socket}/>
+
+{:else if currentScene === "submitAnswer"}
+
+    <p>My team is {currentTeam}</p>
+    <Answer question={currentQuestion} {submitAnswer}/>
 
 {/if}
 
-
 <Buzzer question={currentQuestion} {socket}/>
+
+
+<style>
+    .teamContainer {
+        display: "grid";
+        border: solid 1px blue;
+        grid-template-columns: auto auto;
+    }
+    .teamMember {
+        height: 20px;
+    }
+</style>

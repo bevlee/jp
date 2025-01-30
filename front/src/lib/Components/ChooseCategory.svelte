@@ -1,8 +1,8 @@
 <script>
-    const { categories, teamName, guessingTeam, submitAnswer} = $props();
+    const { categories, activePlayer, username, submitAnswer} = $props();
     console.log("categoreis is", categories)
 
-    const isGuessing = (teamName === guessingTeam);
+    const isActivePlayer = $state((activePlayer === username));
 
     const submit = (category, amount) => {
         //dont do anything if its not the active team playing
@@ -13,7 +13,12 @@
     }
 
 </script>
+{#if isActivePlayer}
+<div> Please select a category</div>
+{:else}
 
+<div> {activePlayer} is selecting a category...</div>
+{/if}
 <div class="gameArea">
     {#each Object.entries(categories) as items}
         {console.log(items[0])}
@@ -22,7 +27,7 @@
 
             <div class="tile">
                 {#if !item.guessed}
-                    <button disabled={isGuessing} class="tileButton" onclick={()=> submit(items[0], item.value)}>
+                    <button disabled={isActivePlayer} class="tileButton" onclick={()=> submit(items[0], item.value)}>
                         <span style={"font-size: 30px"}>${item.value}</span>
                     </button> 
                 {/if}

@@ -9,9 +9,10 @@ const server = createServer(app);
 const io = new Server(server, {
   connectionStateRecovery: {},
   cors: {
-    origin: "http://localhost:4173",
-    methods: ["GET"],
+    origin: "http://localhost:8080",
+    methods: ["GET", "POST"],
   },
+  path: "/socket2/"
 });
 const defaultState = () => {
   return [1,2,3,4,5].map((item) => {
@@ -25,26 +26,45 @@ const categories = {
   anime: defaultState(),
   geography: defaultState(),
   gaming: defaultState(),
-} 
+}
 // list of connections per room
-const connections = {};
+const connections = {
+
+};
 let activeGames = {};
-let teams = [[],[]]
+const teamNames = ["Michelle", "Edana"]
+let baseTeams = [
+  {
+    name: teamNames[0],
+    members: [],
+    score: 0
+  },
+  {
+    name: teamNames[1],
+    members: [],
+    score: 0
+  }
+]
 
 //GAME VARS
 
 io.on("connection", async (socket) => {
   socket.removeAllListeners("startGame");
 
-  addConnection(socket);
+  addConnection(socket, 0);
   const room = socket.handshake.auth.room;
   const username = socket.handshake.auth.username;
   socket.join(room);
 
-  socket.to(room).emit("playerJoined", username);
   let rooms = io.sockets.adapter.rooms;
   console.log("the current connected clients are ", rooms);
-  socket.emit("joinRoom", connections[room]);
+  const teamSets = connections[room].teams;
+  console.log("teamsets:, ", teamSets)
+  const players = Object.keys(connections[room]).filter(key=>key != "teams")
+  console.log()
+  const updatedTeams = [[...teamSets[0]], [...teamSets[1]]]
+  socket.to(room).emit("playerJoined", username, updatedTeams);
+  socket.emit("joinRoom", players, updatedTeams);
 
   socket.on("changeName", (oldName, newName, room, callback) => {
     console.log("existing room connections:", connections[room]);
@@ -59,18 +79,40 @@ io.on("connection", async (socket) => {
       callback({
         status: "ok",
       });
-    }
+      console.log("new room connections:", connections[room]);
 
-    console.log("new room connections:", connections[room]);
-    io.to(room).emit("playerLeft", oldName);
-    io.to(room).emit("playerJoined", newName);
+      const teamSets = connections[room].teams;
+      const updatedTeams = [[...teamSets[0]], [...teamSets[1]]]
+      io.to(room).emit("changeTeam", updatedTeams);
+      io.to(room).emit("playerLeft", oldName);
+      io.to(room).emit("playerJoined", newName);
+    }
+  });
+
+  socket.on("changeTeam", (name, team, room) => {
+    console.log(`${name} is joining team ${1-team}`);
+      connections[room][name].team = 1-team;
+      connections[room].teams[team].delete(name)
+      connections[room].teams[1-team].add(name)
+      console.log("new room connections:", connections[room]);
+
+    const teamSets = connections[room].teams;
+      io.to(room).emit("changeTeam", [[...teamSets[0]], [...teamSets[1]]]);
+      const updatedPlayerId = connections[room][name].playerId
+      const newTeam = 1 - team;
+      io.to(updatedPlayerId).emit("userUpdate", newTeam)
   });
 
   socket.on("disconnect", (reason) => {
+    console.log(username)
     console.log(reason + " disconnected");
-    // console.log(socket.handshake.auth?.username + " username");
     removeConnection(socket);
-    socket.to(room).emit("playerLeft", username);
+    const teamSets = connections[room].teams;
+    for (const team of teamSets) {
+      team.delete(username)
+    }
+    const updatedTeams = [[...teamSets[0]], [...teamSets[1]]]
+    socket.to(room).emit("playerLeft", username, updatedTeams);
   });
 
   socket.on("startGame", () => {
@@ -106,12 +148,6 @@ io.on("connection", async (socket) => {
       activeGames[room]["answer"] = answer;
     }
   });
-  socket.on("guessWord", (guess) => {
-    console.log("guessing word with activegames:", activeGames);
-    if (activeGames[room] && activeGames[room]["stage"] == "guessWord") {
-      activeGames[room]["guess"] = guess;
-    }
-  });
   socket.on("buzzerPressed", () => {
     if (activeGames[room]["waitingForBuzzer"]) {
       activeGames[room]["waitingForBuzzer"] = false;
@@ -134,19 +170,15 @@ const getRandomSelection = (upperBound) => {
 };
 
 const startGameLoop = async (io, room) => {
-  const currentPlayerRoom = room + ".active";
-  const otherPlayersRoom = room + ".inactive";
-  const playerCount = Object.keys(connections[room]).length;
 
   // assign players into two teams
   let allPlayers = Object.entries(connections[room]);
 
-    // assign teams
-  const teams = randomAssignTeams(allPlayers)
-  const split = Math.floor(playerCount / 2);
   let currentPlayer = 0;
   activeGames[room]["gameState"] = categories;
-  let guesses =0;
+  activeGames[room]["teams"] = baseTeams;
+  
+  let guesses = 0;
   // Loop until all categories have been elected
   while (guesses < 20) {
     io.to(room).emit("chooseCategory", activeGames[room]["gameState"], allPlayers[currentPlayer]);
@@ -157,124 +189,76 @@ const startGameLoop = async (io, room) => {
     }, timeLimit);
     console.log("chooseCategory condition finished", activeGames[room]["selection"]);
 
-    const category = activeGames[room]["selection"][0]
-    const questionNo = activeGames[room]["selection"][1]
+    const category = activeGames[room]["selection"][0];
+    const questionNo = activeGames[room]["selection"][1];
     const question = questions[category][questionNo];
 
+    //start the buzzer phase
     io.to(room).emit("buzzer", question);
-  
+
+    let answer = activeGames[room]["answer"];
+
     await waitForCondition(() => {
       return activeGames[room]["buzzerWinner"] !== "";
     }, timeLimit);
-    io.to(activeGames[room]["buzzerWinner"]).emit("submitAnswer", "question");
+    let buzzerWinner = activeGames[room]["buzzerWinner"];
+    let buzzerWinnerId = connections[room]["buzzerWinner"].playerId
+    let buzzerWinnerTeam = connections[room]["buzzerWinner"].team
+    io.to(buzzerWinnerId).emit("submitAnswer", "question");
+    io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
     activeGames[room]["buzzerWinner"] = "";
-
 
     await waitForCondition(() => {
       return activeGames[room]["answer"] !== "";
     }, timeLimit);
-    if (activeGames[room]["answer"] !== answers[category][questionNo]) {
-      activeGames[room]["answer"] !== ""
+    
+    while (answer !== answers[category][questionNo]) {
+
+      activeGames[room][teams][buzzerWinnerTeam] -= 50;
+      io.to(room).emit("scoreChange", buzzerWinnerTeam, activeGames[room][teams][buzzerWinnerTeam])
+      activeGames[room]["answer"] = ""
       io.to(room).emit("buzzer", question);
+  
+      await waitForCondition(() => {
+        return activeGames[room]["buzzerWinner"] !== "";
+      }, timeLimit);
+      buzzerWinner = activeGames[room]["buzzerWinner"];
+      buzzerWinnerId = connections[room]["buzzerWinner"].playerId
+      
+      io.to(buzzerWinnerId).emit("submitAnswer", "question");
+      io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
+      activeGames[room]["buzzerWinner"] = "";
+  
+  
+      await waitForCondition(() => {
+        return activeGames[room]["answer"] !== "";
+      }, timeLimit);
+      
+      answer = activeGames[room]["answer"];
+      if (answer !== answers[category][questionNo]) {
+        io.to(room).emit("buzzer", question);
+  
+        io.to(room).emit("wrongAnswer", "question");
+        io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
+      }
     }
+    const questionData = activeGames[room]["gameState"][category][questionNo]
+    questionData.guessed = true;
 
-
+    activeGames[room][teams][buzzerWinnerTeam] += questionData.value;
+    io.to(room).emit("scoreChange", buzzerWinnerTeam, activeGames[room][teams][buzzerWinnerTeam])
     guesses += 1;
   }
-    const category = activeGames[room]["category"];
-    //get secret word from list of words in chosen category
-    console.log(activeGames[room]);
-    activeGames[room]["stage"] = "writeClues";
-    activeGames[room]["clues"] = [];
-    const secretWord =
-      secretWords[category][getRandomSelection(secretWords[category].length)];
-    activeGames[room]["secretWord"] = secretWord;
-    console.log(secretWord, secretWords);
-    io.to(writerRoom).emit("writeClues", "writer", secretWord);
-    io.to(guesserRoom).emit("writeClues", "guesser", "");
+  
+  const scores = activeGames[room][teams].map(team => team.score)
+  io.to(room).emit("gameFinished", (scores));
 
-    // wait for the writers to submit clues
-    await waitForCondition(() => {
-      return activeGames[room]["clues"].length >= writers.length;
-    }, timeLimit);
-
-    // fill in answers if writers did not submit
-    if (activeGames[room]["clues"].length < writers.length) {
-      for (let i = activeGames[room]["clues"].length; i < writers.length; i++) {
-        activeGames[room]["clues"].push("<no answer>");
-      }
-    }
-
-    const clues = activeGames[room]["clues"];
-    const machineDedupedClues = clues.slice();
-    for (let i = 0; i < clues.length; i++) {
-      for (let j = 0; j < clues.length; j++) {
-        if (i != j) {
-          if (sameWord(clues[i], clues[j])) {
-            machineDedupedClues[i] = "<redacted>";
-            machineDedupedClues[j] = "<redacted>";
-          }
-        }
-      }
-    }
-    // array of boolean to show users which answers are likely invalid
-    const clueVotes = machineDedupedClues.map((clue) =>
-      clue !== "<redacted>" ? 0 : -1
-    );
-    activeGames[room]["votes"] = clueVotes;
-    console.log("clueVotes array looks like", clueVotes);
-    activeGames[room]["finishedVoting"] = false;
-    io.to(writerRoom).emit("filterClues", "writer", clueVotes, clues);
-    io.to(guesserRoom).emit("filterClues", "guesser");
-    activeGames[room]["stage"] = "filterClues";
-
-    // wait for the writers to submit clues
-    await waitForCondition(() => {
-      return activeGames[room]["finishedVoting"];
-    }, timeLimit);
-    let dedupedClues = clues.slice();
-    // cancel out additional voted clues
-    for (let i = 0; i < clues.length; i++) {
-      dedupedClues[i] = clueVotes[i] >= 0 ? dedupedClues[i] : "<redacted>";
-    }
-
-    console.log(dedupedClues, clues);
-    io.to(writerRoom).emit("guessWord", "writer", dedupedClues, clues);
-    io.to(guesserRoom).emit("guessWord", "guesser", dedupedClues, []);
-    activeGames[room]["stage"] = "guessWord";
-    activeGames[room]["guess"] = "";
-    // wait for the writers to submit clues
-    await waitForCondition(() => {
-      return activeGames[room]["guess"] !== "";
-    }, timeLimit);
-    const guess =
-      activeGames[room]["guess"] !== ""
-        ? activeGames[room]["guess"]
-        : "<no guess>";
-    const success = getStem(guess) === secretWord;
-    activeGames[room]["success"] = success;
-    activeGames[room]["dedupedClues"] = dedupedClues;
-    activeGames[room]["gamesPlayed"] = ++round;
-    if (success) activeGames[room]["gamesWon"] = ++winCount;
-
-    console.log(`ending game`);
-    io.to(room).emit("endGame", activeGames[room]);
-
-    await new Promise((resolve) => setTimeout(() => resolve(), 5000));
+  await new Promise((resolve) => setTimeout(() => resolve(), 5000));
   
   delete activeGames[room];
-
 };
 
-const sameWord = (wordA, wordB) => {
-  let stemmedA = getStem(wordA);
-  let stemmedB = getStem(wordB);
-  return stemmedA == stemmedB;
-};
-const getStem = (word) => {
-  return word.trim().toLowerCase();
-};
-
+// check the condition every second up to timeoutSeconds 
 function waitForCondition(checkCondition, timeoutSeconds = 10) {
   const timeout = timeoutSeconds * 1000;
   return new Promise((resolve, reject) => {
@@ -292,17 +276,22 @@ function waitForCondition(checkCondition, timeoutSeconds = 10) {
     }, timeout);
   });
 }
-
-const addConnection = (socket) => {
+// team defaults to 0
+const addConnection = (socket, team = 0 ) => {
   console.log("adding connection to ", connections);
   const auth = socket.handshake.auth;
   const room = auth.room;
   if (!connections[room]) {
-    connections[room] = {};
+    connections[room] = {
+      teams: [
+        new Set(),
+        new Set()
+      ]
+    };
   }
   connections[room][auth.username] = {
-    role: "",
     playerId: socket.id,
+    team: team,
     // pass through the joinroom function
     joinRoom: function (roomName) {
       socket.join(roomName);
@@ -311,6 +300,13 @@ const addConnection = (socket) => {
       socket.leave(roomName);
     },
   };
+  connections[room]["teams"][team].add(auth.username)
+  console.log(connections[room])
+  // console.log("connections[room[",connections[room])
+  // Object.keys(connections[room]).forEach(element => {
+    
+  //   console.log(connections[room][element].playerId)
+  // });
 };
 
 const removeConnection = (socket) => {
