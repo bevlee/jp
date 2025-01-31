@@ -9,7 +9,7 @@ const server = createServer(app);
 const io = new Server(server, {
   connectionStateRecovery: {},
   cors: {
-    origin: "http://localhost:8080",
+    origin: "http://bevsoft.com",
     methods: ["GET", "POST"],
   },
   path: "/socket2/"

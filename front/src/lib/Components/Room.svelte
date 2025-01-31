@@ -46,7 +46,7 @@
             username = newUsername;
         }
         // init socket
-        const socket = io("http://localhost:3001", {
+        const socket = io("http://bevsoft.com", {
                 auth: {
                     serverOffset: 0,
                     username: username,
