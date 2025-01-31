@@ -67,6 +67,7 @@
             currentTeam = team;
         });
         socket.on("changeTeam", ( updatedTeams) => {
+            console.log("updatedTeams", updatedTeams)
             teams[0].members = updatedTeams[0]
             teams[1].members = updatedTeams[1]
         });
@@ -151,14 +152,13 @@
         
         console.log("roomname is", roomName)
         const changeNamePrompt = async () => {
-            console.log("changing name")
             let newName: string = prompt("Please enter your username", username)
             if (newName.length > 0 && newName.length < 30 && newName != username) {
 
                 const nameChangeSuccess = await changeName(newName);
                 if (!nameChangeSuccess) {
                     alert("Error: There is already a player in the room with the name: ");
-                    await changeNamePrompt()
+                    // await changeNamePrompt()
                 } 
             } else {
                 alert("Name must be between 1 and 30 chars and unique. Try again!")
@@ -186,16 +186,10 @@
 
         const startGame = async () => {
             console.log("starting the game")
-            console.log("players are", players)
-            if (players.size < 1) {
-                alert("must have at least 2 players to play!")
-            } else {
-                console.log("we got enough players nice")
-                socket.emit("startGame", (response) => {
-                    console.log("callback was", response)
-                })
-                gameStarted = true
-            }
+            socket.emit("startGame", (response) => {
+                console.log("callback was", response)
+            })
+            gameStarted = true
         }
     </script>
     
@@ -213,21 +207,24 @@
         <button onclick={changeNamePrompt}>Change Name</button>
     {/if}
 
-    <!-- <h4>Players in Lobby: 
+    <h4>Players in Lobby: 
         <ul>
             {#each players.keys() as player}
                 <li>{player}</li>
             {/each}
         </ul>
-    </h4> -->
+    </h4>
 <div class="teamContainer">
     Teams:
     {#each teams as team}
-
     <div>Team {team.name}: ${team.score}</div>
         {#each team.members as member}
+            {#if member=== username}
+            <div class="teamMember bold">{member} (me)</div>
+            {:else}
 
             <div class="teamMember">{member}</div>
+            {/if}
         {/each}
 
     {/each}
@@ -279,5 +276,10 @@
     }
     .teamMember {
         height: 20px;
+    }
+
+    .bold {
+
+        font-weight: 700;
     }
 </style>

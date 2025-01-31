@@ -100,6 +100,8 @@ io.on("connection", async (socket) => {
   socket.emit("joinRoom", players, updatedTeams);
 
   socket.on("changeName", (oldName, newName, room, callback) => {
+    const team = connections[room][oldName].team;
+    console.log("old team was", team)
     console.log("changing name:", oldName, newName, callback);
     if (connections[room][newName]) {
       callback({
@@ -111,13 +113,17 @@ io.on("connection", async (socket) => {
       callback({
         status: "ok",
       });
+      if (connections[room].teams[team].has(oldName)) {
+        connections[room].teams[team].delete(oldName)
+        connections[room].teams[team].add(newName)
+      }
       console.log("new room connections:", connections[room]);
 
       const teamSets = connections[room].teams;
       const updatedTeams = [[...teamSets[0]], [...teamSets[1]]]
-      io.to(room).emit("changeTeam", updatedTeams);
       io.to(room).emit("playerLeft", oldName);
       io.to(room).emit("playerJoined", newName);
+      io.to(room).emit("changeTeam", updatedTeams);
     }
   });
 
