@@ -4,6 +4,7 @@
     import Answer from "./Answer.svelte";
     import Buzzer from "./Buzzer.svelte";
     import ChooseCategory from "./ChooseCategory.svelte";
+    import EndGame from "./EndGame.svelte";
 
     let {roomName, leaveRoom} = $props();
     console.log("Room name in child:", roomName); 
@@ -11,7 +12,7 @@
         let username = $state<string>(localStorage.getItem('username'))
 
         let categories: object = {};
-        let category: string = ""
+        let currentCategory: string = ""
         let timer: Number = 20;
         let answer: string = "hehexd";
         let guess: string = "";
@@ -103,20 +104,28 @@
             activePlayer = guesser
         })
 
-        socket.on("buzzer", (question: string, amount: number) => {
+        socket.on("buzzer", (category: string, amount: number, question: string) => {
             console.log(`changing scene to buzzer with quetsion ${question} and amount ${amount}`)
             currentQuestion = question
             currentAmount = amount
+            currentCategory = category
             currentScene = "buzzer"
+        })
+        socket.on("test", (testMessage) => {
+            console.log(testMessage)
         })
 
         socket.on("guessAnswer", (question: string ) => {
+            console.log(`changing scene to guessAnswer with quetsion ${question} `)
             currentScene = "guessAnswer";
             currentQuestion = question;
         })
 
         socket.on("scoreChange", (teamId: number, newScore: number ) => {
             teams[teamId].score = newScore;
+        })
+        socket.on("gameFinished", () => {
+            currentScene = "gameFinished"
         })
 
         //////// FUNCTIONS
@@ -160,6 +169,9 @@
         const submitAnswer = (input: string) => {
             socket.emit("submitAnswer", input)
             console.log(`submitted ${input} for` ,currentScene)
+        }
+        const guessAnswer  = (guess: string) => {
+            socket.emit("submitAnswer", guess)
         }
         
         const chooseCategory = (category: string, amount: number) => {
@@ -243,12 +255,17 @@
 {:else if currentScene === "buzzer"}
 
     <p>My team is {currentTeam}</p>
-    <Buzzer question={currentQuestion} {username} {socket}/>
+    <Buzzer question={currentQuestion}  {username} {socket}/>
 
-{:else if currentScene === "submitAnswer"}
-
+{:else if currentScene === "guessAnswer"}
+    {console.log("changing to guessAnswer")}
     <p>My team is {currentTeam}</p>
-    <Answer question={currentQuestion} {submitAnswer}/>
+    <Answer question={currentQuestion} submitAnswer={guessAnswer}/>
+
+{:else if currentScene === "gameFinished"}
+    {console.log("changing to guessAnswer")}
+    <p>My team is {currentTeam}</p>
+    <EndGame teams={teams}/>
 
 {/if}
 

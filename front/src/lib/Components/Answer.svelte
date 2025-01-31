@@ -1,15 +1,16 @@
 <script>
-    
     import Timer from "./Timer.svelte";
     
     const { question, submitAnswer} = $props();
     let answer = $state("");
-    const submit = (answer) => {
+    const submit = (e) => {
+
+        e.preventDefault()
         submitAnswer(answer);
     }
 </script>
 
-<Timer count={defaultTimer} submitAnswer={() => submit("")}/>
+<Timer count={15} submitAnswer={() => submit("")}/>
 <div>{question}</div>
 
 <form onsubmit={submit}>
