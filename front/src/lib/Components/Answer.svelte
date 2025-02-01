@@ -13,7 +13,7 @@
 
 <Timer count={15} submitAnswer={() => submit("")}/>
     <h4>Please submit your answer before the time runs out!</h4>
-<h4>The question is: <br/><i>{question}</i></h4>
+<h2>The question is: <br/><i>{question}</i></h2>
 
 <form onsubmit={submit}>
     <input bind:value={answer} >

@@ -25,7 +25,7 @@
 {#if !active}
     <div> {answeringPlayer} is writing their answer</div>
 {:else}
-    <h4>{question}</h4>
+    <h2>{question}</h2>
     <img onclick={buzz} class="buzzer" src={buttonImage}>
 {/if}
 <audio src="https://cdn.freesound.org/previews/560/560189_6086693-lq.mp3" bind:this={buzzerSound}></audio>

@@ -37,7 +37,7 @@ const questions = {
   ],
   geography: 
   [
-    "What is the most southerly capital city in the world","What is the capital city of Switzerland?","What is the only country in South east Asia that was not colonised by Europeans?",
+    "What is the southernmost capital city in the world", "What is the capital city of Switzerland?", "What is the only country in South east Asia that was not colonised by Europeans?",
   ],
   gaming:
   [
@@ -49,7 +49,7 @@ const questions = {
   ],
   random:
   [
-    "What is the name of the Chinese company that just released an efficient new model?","What was the zodiac animal for 2024?","Where is the Nobel peace price warded (city or country)?",
+    "What is the name of the Chinese company that just released an efficient new AI model?","What was the zodiac animal for 2024?","Where is the Nobel peace price awarded (city or country)?",
   ]
 }
 const answers = {  
@@ -208,9 +208,6 @@ server.listen(3001, () => {
   console.log("quiz at http://localhost:3001");
 });
 
-const getRandomSelection = (upperBound) => {
-  return Math.floor(Math.random() * upperBound);
-};
 const getUnguessedQuestion = (state) => {
 
   for (const key of Object.keys(state)) {
@@ -305,7 +302,7 @@ const startGameLoop = async (io, room) => {
       io.to(buzzerWinnerId).emit("guessAnswer", question);
       buzzerWinnerTeam = connections[room][buzzerWinner].team
       io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
-      activeGames[room][buzzerWinner] = "";
+      activeGames[room]["buzzerWinner"] = "";
   
       await waitForCondition(() => {
         return activeGames[room].answer !== "";
