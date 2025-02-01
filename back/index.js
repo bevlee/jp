@@ -24,54 +24,54 @@ const defaultState = () => {
 }
 const categories = {
   anime: defaultState(),
-  // geography: defaultState(),
-  // gaming: defaultState(),
-  // science: defaultState(),
-  // random: defaultState(),
+  geography: defaultState(),
+  gaming: defaultState(),
+  "tv shows": defaultState(),
+  random: defaultState(),
 }
 
 const questions = {  
   anime:
   [
-    "anime1","anime2","anime3",
+    "What language is the word 'Freiren' from?", "What is the name of the team Sora and Shiro form?","What is the name of Taiga's sword?",
   ],
   geography: 
   [
-    "anime1","anime2","anime3",
+    "What is the most southerly capital city in the world","What is the capital city of Switzerland?","What is the only country in South east Asia that was not colonised by Europeans?",
   ],
   gaming:
   [
-    "anime1","anime2","anime3",
+    "How many days are in a season in Stardew Valley?","What is Jinx's hair colour in Arcane/League?","What is the most played roblox game?",
   ],
-  science:
+  "tv shows":
   [
-    "anime1","anime2","anime3",
+    "What year did season 1 of Singles Inferno come out?","What is the name of the TV show where your personal/work memories are divided","In Modern Family, what is Gloria's native country",
   ],
   random:
   [
-    "anime1","anime2","anime3",
+    "What is the name of the Chinese company that just released an efficient new model?","What was the zodiac animal for 2024?","Where is the Nobel peace price warded (city or country)?",
   ]
 }
 const answers = {  
   anime:
   [
-    "answer1","answer2","answer3",
+    "German","Blank","Bokken",
   ],
   geography: 
   [
-    "answer1","answer2","answer3",
+    "Wellington","Bern","Thailand",
   ],
   gaming:
   [
-    "answer1","answer2","answer3",
+    "28","Blue","Brookhaven RP",
   ],
-  science:
+  "tv shows":
   [
-    "answer1","answer2","answer3",
+    "2021","Severence", "Columbia",
   ],
   random:
   [
-    "answer1","answer2","answer3",
+    "Deepseek", "Dragon","Oslo Norway",
   ]
 }
 // list of connections per room
@@ -99,7 +99,13 @@ io.on("connection", async (socket) => {
   socket.to(room).emit("playerJoined", username, updatedTeams);
   socket.emit("joinRoom", players, updatedTeams);
 
+  // if (activeGames[room]) {
+  //   const currentState = activeGames[room]["state"]
+  //   socket.emit("")
+  // }
   socket.on("changeName", (oldName, newName, room, callback) => {
+    const team = connections[room][oldName].team;
+    console.log("old team was", team)
     console.log("changing name:", oldName, newName, callback);
     if (connections[room][newName]) {
       callback({
@@ -111,13 +117,17 @@ io.on("connection", async (socket) => {
       callback({
         status: "ok",
       });
+      if (connections[room].teams[team].has(oldName)) {
+        connections[room].teams[team].delete(oldName)
+        connections[room].teams[team].add(newName)
+      }
       console.log("new room connections:", connections[room]);
 
       const teamSets = connections[room].teams;
       const updatedTeams = [[...teamSets[0]], [...teamSets[1]]]
-      io.to(room).emit("changeTeam", updatedTeams);
       io.to(room).emit("playerLeft", oldName);
       io.to(room).emit("playerJoined", newName);
+      io.to(room).emit("changeTeam", updatedTeams);
     }
   });
 
@@ -241,8 +251,8 @@ const startGameLoop = async (io, room) => {
     
     // wait for the guesser to choose a category'\'s
     await waitForCondition(() => {
-      return (activeGames[room]["category"] !== "");
-    }, timeLimit);
+      return (activeGames[room]["category"] !== "")
+    }, 1000);
     console.log("chooseCategory condition finished", activeGames[room].category);
     //select unguessed question
     let category;
@@ -262,13 +272,13 @@ const startGameLoop = async (io, room) => {
 
     await waitForCondition(() => {
       return activeGames[room].buzzerWinner !== "";
-    }, timeLimit);
+    }, 1000);
     let buzzerWinner = activeGames[room]["buzzerWinner"];
     
     let buzzerWinnerId = connections[room][buzzerWinner].playerId
     let buzzerWinnerTeam = connections[room][buzzerWinner].team
 
-    io.to(buzzerWinnerId).emit("guessAnswer", "question");
+    io.to(buzzerWinnerId).emit("guessAnswer", question);
     io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
     activeGames[room].buzzerWinner = "";
 
@@ -278,13 +288,13 @@ const startGameLoop = async (io, room) => {
     answer = activeGames[room]["answer"];
     while (answer !== answers[category][questionNo]) {
       
-      console.log("answer is ", answers[category][questionNo])
-      io.to(room).emit("wrongAnswer", answer);
-      console.log("answer is wrong")
+      activeGames[room].buzzerWinner = "";
+      io.to(room).emit("guessResult", answer, false);
+      
       activeGames[room]["scores"][buzzerWinnerTeam] -= 50;
       io.to(room).emit("scoreChange", buzzerWinnerTeam, activeGames[room]["scores"][buzzerWinnerTeam])
       activeGames[room]["answer"] = ""
-      io.to(room).emit("buzzer", activeGames[room]["category"], activeGames[room]["amount"]);
+      io.to(room).emit("buzzer", activeGames[room]["category"], activeGames[room]["amount"], question);
   
       activeGames[room]["waitingForBuzzer"] = true;
       await waitForCondition(() => {
@@ -293,7 +303,7 @@ const startGameLoop = async (io, room) => {
       buzzerWinner = activeGames[room]["buzzerWinner"];
       buzzerWinnerId = connections[room][buzzerWinner].playerId
       io.to(buzzerWinnerId).emit("guessAnswer", "question");
-      console.log("answer evenet sent to ", buzzerWinnerId)
+      buzzerWinnerTeam = connections[room][buzzerWinner].team
       io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
       activeGames[room][buzzerWinner] = "";
   
@@ -303,6 +313,8 @@ const startGameLoop = async (io, room) => {
       
       answer = activeGames[room].answer;
     }
+
+    io.to(room).emit("guessResult", answer, true);
     const questionData = activeGames[room]["state"][category][questionNo]
     questionData.guessed = true;
 
