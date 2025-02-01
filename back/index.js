@@ -24,54 +24,54 @@ const defaultState = () => {
 }
 const categories = {
   anime: defaultState(),
-  // geography: defaultState(),
-  // gaming: defaultState(),
-  // science: defaultState(),
-  // random: defaultState(),
+  geography: defaultState(),
+  gaming: defaultState(),
+  "tv shows": defaultState(),
+  random: defaultState(),
 }
 
 const questions = {  
   anime:
   [
-    "anime1","anime2","anime3",
+    "What language is the word 'Freiren' from?", "What is the name of the team Sora and Shiro form?","What is the name of Taiga's sword?",
   ],
   geography: 
   [
-    "anime1","anime2","anime3",
+    "What is the most southerly capital city in the world","What is the capital city of Switzerland?","What is the only country in South east Asia that was not colonised by Europeans?",
   ],
   gaming:
   [
-    "anime1","anime2","anime3",
+    "How many days are in a season in Stardew Valley?","What is Jinx's hair colour in Arcane/League?","What is the most played roblox game?",
   ],
-  science:
+  "tv shows":
   [
-    "anime1","anime2","anime3",
+    "What year did season 1 of Singles Inferno come out?","What is the name of the TV show where your personal/work memories are divided","In Modern Family, what is Gloria's native country",
   ],
   random:
   [
-    "anime1","anime2","anime3",
+    "What is the name of the Chinese company that just released an efficient new model?","What was the zodiac animal for 2024?","Where is the Nobel peace price warded (city or country)?",
   ]
 }
 const answers = {  
   anime:
   [
-    "answer1","answer2","answer3",
+    "German","Blank","Bokken",
   ],
   geography: 
   [
-    "answer1","answer2","answer3",
+    "Wellington","Bern","Thailand",
   ],
   gaming:
   [
-    "answer1","answer2","answer3",
+    "28","Blue","Brookhaven RP",
   ],
-  science:
+  "tv shows":
   [
-    "answer1","answer2","answer3",
+    "2021","Severence", "Columbia",
   ],
   random:
   [
-    "answer1","answer2","answer3",
+    "Deepseek", "Dragon","Oslo Norway",
   ]
 }
 // list of connections per room

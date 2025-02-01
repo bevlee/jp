@@ -6,9 +6,7 @@
       
       const winningTeam = scores[0] > scores[1] ? 0 : 1;
 
-
   </script>
-  
   
   
   <div>
