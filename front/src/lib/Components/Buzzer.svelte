@@ -24,6 +24,9 @@
         answeringPlayer = buzzerWinner;
     });
 
+    socket.on("guessResult", (message, isCorrect) => {
+        active = true;
+    })
     const displayToast = async (msg) => {
 
         showToast = true;
