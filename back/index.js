@@ -2,7 +2,7 @@ import cors from "cors";
 import express from "express";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
-
+import { correctGuess } from "./utils.js";
 const app = express();
 app.use(cors());
 const server = createServer(app);
@@ -286,7 +286,7 @@ const startGameLoop = async (io, room) => {
       return activeGames[room]["answer"] !== "";
     }, timeLimit);
     answer = activeGames[room]["answer"];
-    while (answer !== answers[category][questionNo]) {
+    while(!correctGuess(answer, answers[category][questionNo])) {
       
       activeGames[room].buzzerWinner = "";
       io.to(room).emit("guessResult", answer, false);
