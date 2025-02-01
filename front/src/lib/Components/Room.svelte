@@ -134,7 +134,8 @@
     
     //display toast to user and bring back buzzer
     socket.on("guessResult", (message, isCorrect) => {
-        displayToast(`The guess: ${message} was ${isCorrect}!`);
+        const outcome = isCorrect? "correct!" : "incorrect!"
+        displayToast(`The guess: ${message} was ${outcome}!`);
         active = true;
 
         if (isCorrect) {

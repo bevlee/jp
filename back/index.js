@@ -278,7 +278,7 @@ const startGameLoop = async (io, room) => {
     let buzzerWinnerId = connections[room][buzzerWinner].playerId
     let buzzerWinnerTeam = connections[room][buzzerWinner].team
 
-    io.to(buzzerWinnerId).emit("guessAnswer", "question");
+    io.to(buzzerWinnerId).emit("guessAnswer", question);
     io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
     activeGames[room].buzzerWinner = "";
 
