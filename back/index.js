@@ -55,23 +55,23 @@ const questions = {
 const answers = {  
   anime:
   [
-    "German","Blank","Bokken",
+    "german","blank","bokken",
   ],
   geography: 
   [
-    "Wellington","Bern","Thailand",
+    "wellington","bern","thailand",
   ],
   gaming:
   [
-    "28","Blue","Brookhaven RP",
+    "28","blue","brookhaven rp",
   ],
   "tv shows":
   [
-    "2021","Severence", "Columbia",
+    "2021","severence", "columbia",
   ],
   random:
   [
-    "Deepseek", "Dragon","Oslo Norway",
+    "deepseek", "dragon","oslo norway",
   ]
 }
 // list of connections per room
