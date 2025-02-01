@@ -5,12 +5,19 @@
     import Buzzer from "./Buzzer.svelte";
     import ChooseCategory from "./ChooseCategory.svelte";
     import EndGame from "./EndGame.svelte";
+///sounds
+
+    import oofMp3 from "../../assets/oof.mp3";
+    let buzzerSound
+    let oofSound
+    let successSound
+    let winSound
+
 
     let {roomName, leaveRoom} = $props();
     console.log("Room name in child:", roomName); 
         let gameStarted = $state<boolean>(false)
         let username = $state<string>(localStorage.getItem('username'))
-
         let categories: object = {};
         let currentCategory: string = ""
         let timer: Number = 20;
@@ -120,15 +127,38 @@
             console.log(`changing scene to guessAnswer with quetsion ${question} `)
             currentScene = "guessAnswer";
             currentQuestion = question;
+
         })
 
         socket.on("scoreChange", (teamId: number, newScore: number ) => {
             teams[teamId].score = newScore;
         })
         socket.on("gameFinished", () => {
+            winSound.play()
             currentScene = "gameFinished"
         })
 
+        let showToast = $state(false);
+        let toastMessage = $state("");
+    let active = $state(true);
+    //display toast to user and bring back buzzer
+    socket.on("guessResult", (message, isCorrect) => {
+        displayToast(`The guess: ${message} was ${isCorrect}!`);
+        active = true;
+
+        if (isCorrect) {
+            successSound.play()
+        } else {
+            oofSound.play()
+        }
+    });
+
+    const displayToast = async (msg) => {
+
+        showToast = true;
+        await setTimeout(function(){ showToast=false }, 3000);
+        toastMessage = msg;
+    }
         //////// FUNCTIONS
         const changeName = async (newName: string) => {
             const success = await new Promise(resolve=> {
@@ -193,7 +223,7 @@
         }
     </script>
     
-    <button onclick={()=>leave()}>Leave room</button>
+    <button class="bigButton" onclick={()=>leave()}>Leave room</button>
     
     <h3>Room: 
         <strong>{roomName}</strong>
@@ -204,20 +234,20 @@
     </h4>
     
     {#if currentScene==="main" || currentScene==="endGame"}
-        <button onclick={changeNamePrompt}>Change Name</button>
+        <button  class="bigButton" onclick={changeNamePrompt}>Change Name</button>
     {/if}
 
-    <h4>Players in Lobby: 
+    <!-- <h4>Players in Lobby: 
         <ul>
             {#each players.keys() as player}
                 <li>{player}</li>
             {/each}
         </ul>
-    </h4>
+    </h4> -->
 <div class="teamContainer">
     Teams:
     {#each teams as team}
-    <div>Team {team.name}: ${team.score}</div>
+    <div  class="header">Team {team.name}: ${team.score}</div>
         {#each team.members as member}
             {#if member=== username}
             <div class="teamMember bold">{member} (me)</div>
@@ -228,7 +258,7 @@
         {/each}
 
     {/each}
-    <button onclick={changeTeam}> Change team </button>
+    <button  class="bigButton" hidden={currentScene!=="main"} onclick={changeTeam}> Change team </button>
 </div>
 {#if currentScene == "main"}
     <div>
@@ -246,28 +276,31 @@
 
 {:else if currentScene === "chooseCategory"}
 
-    <p>My team is {currentTeam}</p>
     <ChooseCategory {categories} {activePlayer} {username} submitAnswer={chooseCategory} />
 
 {:else if currentScene === "buzzer"}
 
-    <p>My team is {currentTeam}</p>
     <Buzzer question={currentQuestion}  {username} {socket}/>
 
 {:else if currentScene === "guessAnswer"}
     {console.log("changing to guessAnswer")}
-    <p>My team is {currentTeam}</p>
     <Answer question={currentQuestion} submitAnswer={guessAnswer}/>
 
 {:else if currentScene === "gameFinished"}
     {console.log("changing to guessAnswer")}
-    <p>My team is {currentTeam}</p>
     <EndGame teams={teams}/>
 
 {/if}
 
 
-
+<audio src="https://cdn.freesound.org/previews/560/560189_6086693-lq.mp3" bind:this={buzzerSound}></audio>
+<audio src="https://cdn.freesound.org/previews/109/109663_945474-lq.mp3" bind:this={successSound}></audio>
+<audio src="https://cdn.freesound.org/previews/269/269198_4409114-lq.mp3" bind:this={winSound}></audio>
+<audio src={oofMp3} bind:this={oofSound}></audio>
+<div id="snackbar" class={showToast ? "show" : ""} hidden={!showToast}> {toastMessage}</div>
+<button onclick={()=>buzzerSound.play()}>buzz</button>
+<button onclick={()=>successSound.play()}>success</button>
+<button onclick={()=>oofSound.play()}>oof</button>
 <style>
     .teamContainer {
         display: "grid";
@@ -276,10 +309,29 @@
     }
     .teamMember {
         height: 20px;
+        color: blueviolet;
+        font-weight: 600;
     }
 
     .bold {
 
-        font-weight: 700;
+        font-weight: 800;
+        font-style: italic
     }
+    .bigButton {
+  border-radius: 8px;
+  border: 1px solid black;
+  padding: 1.5vh;
+  margin: 1.5vh;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+.header { 
+
+    font-style: 900;
+}
+    
 </style>

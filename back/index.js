@@ -99,6 +99,10 @@ io.on("connection", async (socket) => {
   socket.to(room).emit("playerJoined", username, updatedTeams);
   socket.emit("joinRoom", players, updatedTeams);
 
+  // if (activeGames[room]) {
+  //   const currentState = activeGames[room]["state"]
+  //   socket.emit("")
+  // }
   socket.on("changeName", (oldName, newName, room, callback) => {
     const team = connections[room][oldName].team;
     console.log("old team was", team)
@@ -247,8 +251,8 @@ const startGameLoop = async (io, room) => {
     
     // wait for the guesser to choose a category'\'s
     await waitForCondition(() => {
-      return (activeGames[room]["category"] !== "");
-    }, timeLimit);
+      return (activeGames[room]["category"] !== "")
+    }, 1000);
     console.log("chooseCategory condition finished", activeGames[room].category);
     //select unguessed question
     let category;
@@ -268,7 +272,7 @@ const startGameLoop = async (io, room) => {
 
     await waitForCondition(() => {
       return activeGames[room].buzzerWinner !== "";
-    }, timeLimit);
+    }, 1000);
     let buzzerWinner = activeGames[room]["buzzerWinner"];
     
     let buzzerWinnerId = connections[room][buzzerWinner].playerId
@@ -284,13 +288,14 @@ const startGameLoop = async (io, room) => {
     answer = activeGames[room]["answer"];
     while (answer !== answers[category][questionNo]) {
       
+      activeGames[room].buzzerWinner = "";
       console.log("answer is ", answers[category][questionNo])
-      io.to(room).emit("wrongAnswer", answer);
+      io.to(room).emit("guessResult", answer, false);
       console.log("answer is wrong")
       activeGames[room]["scores"][buzzerWinnerTeam] -= 50;
       io.to(room).emit("scoreChange", buzzerWinnerTeam, activeGames[room]["scores"][buzzerWinnerTeam])
       activeGames[room]["answer"] = ""
-      io.to(room).emit("buzzer", activeGames[room]["category"], activeGames[room]["amount"]);
+      io.to(room).emit("buzzer", activeGames[room]["category"], activeGames[room]["amount"], question);
   
       activeGames[room]["waitingForBuzzer"] = true;
       await waitForCondition(() => {
@@ -299,7 +304,7 @@ const startGameLoop = async (io, room) => {
       buzzerWinner = activeGames[room]["buzzerWinner"];
       buzzerWinnerId = connections[room][buzzerWinner].playerId
       io.to(buzzerWinnerId).emit("guessAnswer", "question");
-      console.log("answer evenet sent to ", buzzerWinnerId)
+      console.log("answer event sent to ", buzzerWinnerId)
       io.to(room).except(buzzerWinnerId).emit("buzzerPressed", buzzerWinner);
       activeGames[room][buzzerWinner] = "";
   
@@ -309,6 +314,8 @@ const startGameLoop = async (io, room) => {
       
       answer = activeGames[room].answer;
     }
+
+    io.to(room).emit("guessResult", answer, true);
     const questionData = activeGames[room]["state"][category][questionNo]
     questionData.guessed = true;
 
