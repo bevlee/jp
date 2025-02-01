@@ -3,19 +3,11 @@
     
     const { question, username, socket} = $props();
     
-        let buzzerSound
-    let oofSound
-    let successSound
-
-
+    let buzzerSound
     const buzz = () => {
         buzzerSound.play()
-    
         socket.emit("buzzerPressed");
     }
-
-    let showToast = $state(false);
-    let toastMessage = $state("");
     let answeringPlayer = $state("");
     let active = $state(true);
 
@@ -27,14 +19,6 @@
     socket.on("guessResult", (message, isCorrect) => {
         active = true;
     })
-    const displayToast = async (msg) => {
-
-        showToast = true;
-        await setTimeout(function(){ showToast=false }, 3000);
-        toastMessage = msg;
-    }
-
-
 </script>
 
 
@@ -45,7 +29,6 @@
     <img onclick={buzz} class="buzzer" src={buttonImage}>
 {/if}
 <audio src="https://cdn.freesound.org/previews/560/560189_6086693-lq.mp3" bind:this={buzzerSound}></audio>
-<button class="big" onclick={() => displayToast("lmao xd")}></button>
 
 <style>
     .big {
